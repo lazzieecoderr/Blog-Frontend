@@ -11,15 +11,22 @@ import { app } from "../firebase";
 import { CircularProgressbar } from "react-circular-progressbar";
 import "react-circular-progressbar/dist/styles.css";
 import { HiInformationCircle } from "react-icons/hi";
+import { Modal } from "flowbite-react";
+import { HiOutlineExclamationCircle } from "react-icons/hi";
 import {
+  signOutSuccess,
   updateFailure,
   updateStart,
   updateSuccess,
+  deleteUserFailure,
+  deleteUserStart,
+  deleteUserSuccess,
 } from "../Redux/Slice/userSlice";
+import { Link } from "react-router-dom";
 
 const DashboardProfile = () => {
   const dispatch = useDispatch();
-  const { currentuser } = useSelector((state) => state.user);
+  const { currentuser, loading, error } = useSelector((state) => state.user);
   const [imageFile, setImageFile] = useState(null);
   const [imageFileUrl, setImageFileUrl] = useState(null);
   const [imageFileUploadProgress, setImageFileUploadProgress] = useState(null);
@@ -28,8 +35,10 @@ const DashboardProfile = () => {
   const [imageFileUploading, setImageFileUploading] = useState(false);
   const [updateUserSuccess, setUpdateUserSuccess] = useState(null);
   const [updateUserError, setUpdateUserError] = useState(null);
+  const [showModal, setShowModal] = useState(false);
   const filePickerRef = useRef();
 
+  //onchange in the image uploading
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -38,6 +47,7 @@ const DashboardProfile = () => {
     }
   };
 
+  //uploading process
   useEffect(() => {
     if (imageFile) {
       uploadImage();
@@ -77,11 +87,11 @@ const DashboardProfile = () => {
       }
     );
   };
-
+  //onchange in the input fields
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.id]: e.target.value });
   };
-
+  //updating user
   const handleSubmit = async (e) => {
     e.preventDefault();
     setUpdateUserError(null);
@@ -102,6 +112,7 @@ const DashboardProfile = () => {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
+            token: localStorage.getItem("Token"),
           },
           body: JSON.stringify(formData),
         }
@@ -117,6 +128,36 @@ const DashboardProfile = () => {
     } catch (error) {
       dispatch(updateFailure(error.message));
       setUpdateUserError(error.message);
+    }
+  };
+  //signout
+  const handleSignout = () => {
+    dispatch(signOutSuccess());
+    localStorage.removeItem("Token");
+  };
+  //delete user
+  const handleDelete = async () => {
+    setShowModal(false);
+    try {
+      dispatch(deleteUserStart());
+      const response = await fetch(
+        `http://localhost:5000/api/user/delete/${currentuser.rest._id}`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            token: localStorage.getItem("Token"),
+          },
+        }
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        dispatch(deleteUserFailure(data.message));
+      } else {
+        dispatch(deleteUserSuccess(data));
+      }
+    } catch (error) {
+      dispatch(deleteUserFailure(error.message));
     }
   };
 
@@ -190,28 +231,77 @@ const DashboardProfile = () => {
           placeholder="********"
           onChange={handleChange}
         />
-        <Button type="submit" gradientDuoTone="purpleToPink">
-          Update
+        <Button
+          type="submit"
+          gradientDuoTone="purpleToPink"
+          disabled={loading || imageFileUploading}
+        >
+          {loading ? "loading..." : "update"}
         </Button>
+        {currentuser.rest.isAdmin && (
+          <Link to="/create-post">
+            <Button
+              type="submit"
+              gradientDuoTone="purpleToPink"
+              className="w-full"
+            >
+             
+              Create Post
+            </Button>
+          </Link>
+        )}
       </form>
       <div className="text-red-600 flex justify-between mt-5">
-        <span className="cursor-pointer">Delete Account</span>
-        <span className="cursor-pointer">Sign Out</span>
+        <span className="cursor-pointer" onClick={() => setShowModal(true)}>
+          Delete Account
+        </span>
+        <span className="cursor-pointer" onClick={handleSignout}>
+          Sign Out
+        </span>
       </div>
       {updateUserSuccess && (
-        <Alert color="failure" icon={HiInformationCircle} className="mt-5">
-        <span className="font-medium me-2">😎Yaaa!</span>
-        {updateUserSuccess}
-      </Alert>
+        <Alert color="success" icon={HiInformationCircle} className="mt-5">
+          <span className="font-medium me-2">😎Yaaa!</span>
+          {updateUserSuccess}
+        </Alert>
       )}
-      {
-        updateUserError && (
-          <Alert color="failure" icon={HiInformationCircle} className="mt-5">
-            <span className="font-medium me-2">🥴OOPS!</span>
-            {updateUserError}
-          </Alert>
-        )
-      }
+      {updateUserError && (
+        <Alert color="failure" icon={HiInformationCircle} className="mt-5">
+          <span className="font-medium me-2">🥴OOPS!</span>
+          {updateUserError}
+        </Alert>
+      )}
+      {error && (
+        <Alert color="failure" icon={HiInformationCircle} className="mt-5">
+          <span className="font-medium me-2">🥴OOPS!</span>
+          {error}
+        </Alert>
+      )}
+      <Modal
+        show={showModal}
+        onClose={() => setShowModal(false)}
+        popup
+        size="md"
+      >
+        <Modal.Header />
+
+        <Modal.Body>
+          <div className="text-center">
+            <HiOutlineExclamationCircle className="h-14 w-14 text-gray-500 dark:text-gray-200 mb-4 mx-auto" />
+            <h3 className="mb-5 text-lg  text-gray-500 dark:text-gray-200">
+              Are you sure you want to delete this Account
+            </h3>
+            <div className="flex justify-center gap-4">
+              <Button color="failure" onClick={handleDelete}>
+                Yes,I'm sure
+              </Button>
+              <Button color="gray" onClick={() => setShowModal(false)}>
+                No,Changed My Mind
+              </Button>
+            </div>
+          </div>
+        </Modal.Body>
+      </Modal>
     </div>
   );
 };

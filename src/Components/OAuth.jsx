@@ -31,6 +31,7 @@ const OAuth = () => {
         })
         const data = await res.json();
         if(res.ok){
+          localStorage.setItem("Token",data.token)
             dispatch(signInSuccess(data))
             navigate('/')
         }
